@@ -16,22 +16,44 @@ def adicionarJogador(tag_jogador):
     url = f"https://api.clashroyale.com/v1/players/%23{tag_jogador}"
     
     response = requests.get(url, headers=headers)
-    
-    if response.status_code == 200:
-        data = response.json()
-        print("Dados obtidos com sucesso!")
-    else:
-        print(f"Erro: {response.status_code}")
-    
+
     client = MongoClient(atlas)
     db = client['ClashRoyale']  
-    collection = db['Jogadores']  
+    collection = db['Jogadores'] 
+    
+    if response.status_code == 200:
+        player_data = response.json()
 
-    collection.insert_one(data)
-    print("MongoDB Atlas Atualizado.")
+        player_tag = player_data.get('tag', 'Tag não disponível')
+        player_name = player_data.get('name', 'Nome não disponível')
+        player_level = player_data.get('expLevel', 'Nível não disponível')
+        player_trophies = player_data.get('trophies', 'Troféus não disponíveis')
+        player_clan = player_data.get('clan', {}).get('name', 'Sem clã')
+        player_wins = player_data.get('wins', 'Vitórias não disponíveis')
+        player_losses = player_data.get('losses', 'Derrotas não disponíveis')
 
-    client.close()
-    return None 
+        data_document = {
+            'playerTag' : {tag_jogador},
+            'name' : player_name,
+            'level' : player_level,
+            'trophies' : player_trophies,
+            'clan' : player_clan,
+            'wins' : player_wins,
+            'losses' : player_losses
+        }
+
+        result = collection.update_one(
+        {'playerTag' : tag_jogador},
+        {'$set': data_document},
+        upsert=True
+    )
+
+    if result.upserted_id:
+        print(f'Documento inserido com ID: {result.upserted_id}')
+    else:
+        print(f'Documento atualizado com sucesso!')
+else:
+    print(f'Erro: {response.status_code}') 
 
 def adicionarBatalhas(tag_jogador):
     
@@ -39,20 +61,64 @@ def adicionarBatalhas(tag_jogador):
 
     response = requests.get(url, headers=headers)
 
-    if response.status_code == 200:
-        data = response.json()
-        print("Dados obtidos com sucesso!")
-    else:
-        print(f"Erro: {response.status_code}")
-
     client = MongoClient(atlas)
     db = client['ClashRoyale']      
-    collection = db['Batalhas']  
+    collection = db['Batalhas']
 
-    collection.insert_many(data)
-    print("MongoDB Atlas Atualizado.")
+    if response.status_code == 200:
 
-    client.close()
+        battle_log = response.json()  
+             
+        for battle in battle_log:
+                
+            battle_start_time = battle['battleTime']  
+                
+            team_1 = battle['team'][0]
+            team_2 = battle['opponent'][0]
+
+                
+            player_1_trophies = team_1.get('startingTrophies', 'Não disponível')
+            player_1_tower_destroys = team_1.get('crowns', 0)
+            player_1_deck = team_1.get('cards', [])
+
+                
+            player_2_trophies = team_2.get('startingTrophies', 'Não disponível')
+            player_2_tower_destroys = team_2.get('crowns', 0)
+            player_2_deck = team_2.get('cards', [])
+
+                
+            winner = "Jogador 1" if player_1_tower_destroys > player_2_tower_destroys else "Jogador 2" if player_2_tower_destroys > player_1_tower_destroys else "Empate"
+
+                
+            battle_start_time = datetime.strptime(battle_start_time, "%Y%m%dT%H%M%S.%fZ")
+
+                
+            battle_end_time = battle_start_time + timedelta(minutes=3)
+
+                
+            battle_document = {
+                'battleStart': battle_start_time,
+                'battleEnd': battle_end_time,
+                'player1': {
+                    'trophies': player_1_trophies,
+                    'tower_destroys': player_1_tower_destroys,
+                    'deck': [card['name'] for card in player_1_deck]
+                },
+                'player2': {
+                    'trophies': player_2_trophies,
+                    'tower_destroys': player_2_tower_destroys,
+                    'deck': [card['name'] for card in player_2_deck]
+                },
+                'winner': winner
+            }
+
+                
+            result = collection.insert_one(battle_document)
+
+            print(f'Documento de batalha inserido com ID: {result.inserted_id}')
+
+        else:
+            print(f"Erro: {response.status_code}")    
 
 adicionarJogador("JYQLP2J2P")
 adicionarBatalhas("JYQLP2J2P")
