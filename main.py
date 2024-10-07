@@ -2,6 +2,7 @@ import requests
 from pymongo import MongoClient
 from dotenv import load_dotenv
 import os
+from datetime import timedelta, datetime
 
 load_dotenv()
 
@@ -32,8 +33,8 @@ def adicionarJogador(tag_jogador):
         player_wins = player_data.get('wins', 'Vitórias não disponíveis')
         player_losses = player_data.get('losses', 'Derrotas não disponíveis')
 
-        data_document = {
-            'playerTag' : {tag_jogador},
+        player_document = {
+            'playerTag' : player_tag,
             'name' : player_name,
             'level' : player_level,
             'trophies' : player_trophies,
@@ -43,17 +44,18 @@ def adicionarJogador(tag_jogador):
         }
 
         result = collection.update_one(
-        {'playerTag' : tag_jogador},
-        {'$set': data_document},
+        {'playerTag' : player_tag},
+        {'$set': player_document},
         upsert=True
     )
 
-    if result.upserted_id:
-        print(f'Documento inserido com ID: {result.upserted_id}')
+        if result.upserted_id:
+            print(f'Documento inserido com ID: {result.upserted_id}')
+        else:
+            print(f'Documento atualizado com sucesso!')
     else:
-        print(f'Documento atualizado com sucesso!')
-else:
-    print(f'Erro: {response.status_code}') 
+        print(f'Erro: {response.status_code}') 
+
 
 def adicionarBatalhas(tag_jogador):
     
@@ -120,5 +122,5 @@ def adicionarBatalhas(tag_jogador):
         else:
             print(f"Erro: {response.status_code}")    
 
-adicionarJogador("JYQLP2J2P")
-adicionarBatalhas("JYQLP2J2P")
+# adicionarBatalhas('200VLY909J')
+# adicionarJogador('200VLY909J')

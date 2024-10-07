@@ -1,0 +1,327 @@
+
+db.dados.aggregate([
+  {
+    $match: {
+      battleStart: {
+        $gte: ISODate("2024-10-07T00:00:00Z"), 
+        $lte: ISODate("2024-10-08T00:00:00Z")  
+      }
+    }
+  },
+  {
+    $match: {
+      $or: [
+        { "player1.deck": "Goblin Giant" },  
+        { "player2.deck": "Ice Spirit" }  
+      ]
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalGames: { $sum: 1 }, 
+      wins: {
+        $sum: {
+          $cond: [
+            { $eq: ["$winner", "Jogador 1"] }, 1, 0
+          ]
+        }
+      },
+      losses: {
+        $sum: {
+          $cond: [
+            { $eq: ["$winner", "Jogador 2"] }, 1, 0
+          ]
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      winPercentage: { $multiply: [{ $divide: ["$wins", "$totalGames"] }, 100] },
+      lossPercentage: { $multiply: [{ $divide: ["$losses", "$totalGames"] }, 100] },
+      totalGames: 1,
+      wins: 1,
+      losses: 1
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Batalhas.aggregate([
+  {
+    $match: {
+      $or: [
+        {
+          $and: [
+            { "player1.deck": "Miner" }, 
+            { "player1.deck": "Monk" } 
+          ]
+        },
+        {
+          $and: [
+            { "player2.deck": "Mortar" }, 
+            { "player2.deck": "Knight" }  
+          ]
+        }
+      ]
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalGamesWithCombo: { $sum: 1 }, 
+      lossesWithCombo: {               
+        $sum: {
+          $cond: [
+            { $or: [
+                { $eq: ["$winner", "Jogador 2"] }, 
+                { $eq: ["$winner", "Jogador 1"] }  
+              ]
+            }, 0, 1
+          ]
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      totalGamesWithCombo: 1,
+      lossesWithCombo: 1,
+      lossPercentageWithCombo: { $multiply: [{ $divide: ["$lossesWithCombo", "$totalGamesWithCombo"] }, 100] }
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Batalhas.aggregate([
+  {
+    $match: {
+      battleStart: {
+        $gte: ISODate("2024-10-01T00:00:00Z"), 
+        $lte: ISODate("2024-10-07T23:59:59Z")
+      }
+    }
+  },
+  {
+    $facet: {
+      player1Wins: [
+        { $match: { winner: "Jogador 1" } },
+        { $project: { _id: 0, cards: "$player1.deck" } }
+      ],
+      player2Wins: [
+        { $match: { winner: "Jogador 2" } },
+        { $project: { _id: 0, cards: "$player2.deck" } }
+      ]
+    }
+  },
+  {
+    $project: {
+      allWinningDecks: { $concatArrays: ["$player1Wins.cards", "$player2Wins.cards"] }
+    }
+  },
+  { 
+    $unwind: "$allWinningDecks"
+  },
+  { 
+    $match: {
+      $expr: { $eq: [{ $size: "$allWinningDecks" }, 8] } 
+    }
+  },
+  {
+    $group: {
+      _id: "$allWinningDecks", 
+      count: { $sum: 1 }       
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalWins: { $sum: "$count" },  
+      comboWins: { $push: { combo: "$_id", count: "$count" } } 
+    }
+  },
+  {
+    $unwind: "$comboWins"
+  },
+  {
+    $project: {
+      combo: "$comboWins.combo",
+      winPercentage: {
+        $multiply: [{ $divide: ["$comboWins.count", "$totalWins"] }, 100]  
+      }
+    }
+  },
+  {
+    $match: {
+      winPercentage: { $gt: 10 } // Y é a porcentagem mínima de vitórias (ex: 10)
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      combo: 1,
+      winPercentage: 1
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Jogadores.aggregate([
+  { 
+    $match: { playerTag: "#200VLY909J" } 
+  },
+  {
+    $project: {
+      name: 1,
+      wins: 1,
+      losses: 1,
+      totalBattles: { $add: ["$wins", "$losses"] },  
+      winPercentage: {  
+        $cond: {
+          if: { $eq: [{ $add: ["$wins", "$losses"] }, 0] },  
+          then: 0,
+          else: {
+            $multiply: [
+              { $divide: ["$wins", { $add: ["$wins", "$losses"] }] },
+              100
+            ]
+          }
+        }
+      }
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Jogadores.aggregate([
+  { 
+    $match: { playerTag: "#200VLY909J" }  
+  },
+  {
+    $project: {
+      name: 1,
+      wins: 1,
+      losses: 1,
+      totalBattles: { $add: ["$wins", "$losses"] },  
+      lossPercentage: {  
+        $cond: {
+          if: { $eq: [{ $add: ["$wins", "$losses"] }, 0] },  
+          then: 0,
+          else: {
+            $multiply: [
+              { $divide: ["$losses", { $add: ["$wins", "$losses"] }] },
+              100
+            ]
+          }
+        }
+      }
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Batalhas.aggregate([
+  {
+    $match: {
+      battleStart: {
+        $gte: ISODate("2024-10-07T00:00:00Z"), 
+        $lte: ISODate("2024-10-08T00:00:00Z")  
+      }
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalGames: { $sum: 1 },  
+      victories: {             
+        $sum: {
+          $cond: [
+            { $eq: ["$winner", "Jogador 1"] }, 1, 0
+          ]
+        }
+      }
+    }
+  },
+  {
+    $project: {
+      totalGames: 1,
+      victories: 1,
+      winPercentage: { $multiply: [{ $divide: ["$victories", "$totalGames"] }, 100] }
+    }
+  }
+])
+
+-----------------------------------------------------------------------
+
+db.Batalhas.aggregate([
+  {
+    $match: {
+      battleStart: {
+        $gte: ISODate("2024-10-01T00:00:00Z"), 
+        $lte: ISODate("2024-10-07T23:59:59Z")  
+      }
+    }
+  },
+  {
+    $facet: {
+      player1Wins: [
+        { $match: { winner: "Jogador 1" } },
+        { $project: { _id: 0, deck: "$player1.deck" } }
+      ],
+      player2Wins: [
+        { $match: { winner: "Jogador 2" } },
+        { $project: { _id: 0, deck: "$player2.deck" } }
+      ]
+    }
+  },
+  {
+    $project: {
+      allWinningDecks: { $concatArrays: ["$player1Wins.deck", "$player2Wins.deck"] }
+    }
+  },
+  {
+    $unwind: "$allWinningDecks"
+  },
+  {
+    $group: {
+      _id: "$allWinningDecks", 
+      count: { $sum: 1 }         
+    }
+  },
+  {
+    $group: {
+      _id: null,
+      totalWins: { $sum: "$count" },  
+      deckWins: { $push: { deck: "$_id", count: "$count" } }  
+    }
+  },
+  {
+    $unwind: "$deckWins"
+  },
+  {
+    $project: {
+      deck: "$deckWins.deck",
+      winPercentage: {
+        $multiply: [{ $divide: ["$deckWins.count", "$totalWins"] }, 100]  
+      }
+    }
+  },
+  {
+    $match: {
+      winPercentage: { $gt: 5 } 
+    }
+  },
+  {
+    $project: {
+      _id: 0,
+      deck: 1,
+      winPercentage: 1
+    }
+  }
+])
