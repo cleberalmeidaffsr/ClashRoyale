@@ -120,7 +120,8 @@ def adicionarBatalhas(tag_jogador):
             print(f'Documento de batalha inserido com ID: {result.inserted_id}')
 
         else:
-            print(f"Erro: {response.status_code}")    
+            print(f"Erro: {response.status_code}")   
+            
 
-# adicionarBatalhas('200VLY909J')
-# adicionarJogador('200VLY909J')
+adicionarBatalhas('200VLY909J')
+adicionarJogador('200VLY909J')

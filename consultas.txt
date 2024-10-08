@@ -1,5 +1,5 @@
 
-db.dados.aggregate([
+db.Batalhas.aggregate([
   {
     $match: {
       battleStart: {
@@ -156,7 +156,7 @@ db.Batalhas.aggregate([
   },
   {
     $match: {
-      winPercentage: { $gt: 10 } // Y é a porcentagem mínima de vitórias (ex: 10)
+      winPercentage: { $gt: 10 }
     }
   },
   {
